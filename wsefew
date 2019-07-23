@@ -1,0 +1,111 @@
+import numpy as np
+import pandas as pd
+#from sklearn.ensemble import RandomForestClassifier
+import pickle
+#import xgboost
+#from sklearn.model_selection import train_test_split
+from sklearn import model_selection, preprocessing, naive_bayes, metrics, svm,cluster
+
+import nltk
+#nltk.download('stopwords')
+from nltk.corpus import stopwords
+import re
+from nltk.stem.snowball import PorterStemmer
+stemmer = SnowballStemmer('english')
+stpwords=set(stopwords.words('english'))
+
+##stopwords without negation
+l=stopwords.words('english')
+print(len(l))
+l.remove('no')
+l.remove('not')
+l.append('cust')
+l.append('customer')
+l.append('said')
+print(len(l))
+stpwords=set(l)
+
+
+fil=pd.read_excel('Disposition.xlsx')
+#fil['NEW_REMARK']=file['NEW_REMARK'].fillna('Null')
+fil=fil[~fil['NEW_REMARK'].isnull()].reset_index(drop=True)
+
+
+
+def stop_stem(data):
+    return data.apply(lambda x: " ".join([stemmer.stem(i) for i in re.sub("[^a-zA-Z]", " ", x).split() if i not in stpwords]).lower())
+
+
+fil['NEW_REMARK_new']=fil['NEW_REMARK']
+for i in range(0,len(fil['NEW_REMARK'])):
+    try:
+        fil['NEW_REMARK_new'][i:i+1]=stop_stem(fil['NEW_REMARK'][i:i+1].str.lower())
+    except TypeError:
+        fil['NEW_REMARK_new'][i:i+1]=None
+
+fil.to_excel("testing texts.xlsx",index=False)
+
+fil=fil[~fil['NEW_REMARK_new'].isnull()].reset_index(drop=True)
+
+
+texts=fil['NEW_REMARK_new'].tolist()
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer()
+tfidf.fit(texts)
+
+X = tfidf.transform(texts)
+
+
+import sklearn.decomposition as skd
+
+#matrix = np.random.random((20,20))
+trsvd = skd.TruncatedSVD(n_components=15,n_iter=100)
+transformed = trsvd.fit(X)
+
+terms=tfidf.get_feature_names()
+
+for i,comp in enumerate(trsvd.components_):
+    compterms=zip(terms,comp)
+    sortedterms=sorted(compterms,key=lambda x:x[1],reverse=True)
+    sortedterms=sortedterms[:10]
+    print("====",i,"=====")
+    for term in sortedterms:
+        print(term)
+    
+
+
+
+concept_words={}
+for i,comp in enumerate(trsvd.components_):
+    compterms=zip(terms,comp)
+    sortedterms=sorted(compterms,key=lambda x:x[1],reverse=True)
+    sortedterms=sortedterms[:10]
+    print("====",i,"=====")
+    concept_words["rule "+str(i)]=sortedterms
+
+
+
+for key in concept_words.keys():
+    sent_scor=[]
+    for sent in texts:
+        words=nltk.word_tokenize(sent)
+        score=0
+        for word in words:
+            for word_with_score in concept_words[key]:
+                if word==word_with_score[0]:
+                    score+=word_with_score[1]
+        sent_scor.append(score)
+    print("======",key,"=========")
+    for sent_sc in sent_scor:
+        print(sent_sc)
+
+
+import nltk
+nltk.word_tokenize('this')
+
+
+
+    
+    
+    
